@@ -5,12 +5,12 @@
 # See ADR 0033 for details.
 version: "1"
 roles:
-    - triage
-    - coder
-    - review
-    - fix
-    - retro
-    - prioritize
+    # - triage
+    # - coder
+    # - review
+    # - fix
+    # - retro
+    # - prioritize
     - ci-diagnose
 allowed_remote_resources:
     - https://raw.githubusercontent.com/fullsend-ai/fullsend/
