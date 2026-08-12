@@ -15,6 +15,9 @@ model: opus
 image: ghcr.io/fullsend-ai/fullsend-sandbox:latest
 policy: policies/ci-diagnose.yaml
 
+providers:
+  - vertex-ai 
+
 role: ci-diagnose
 slug: ci-diagnose
 
@@ -51,6 +54,7 @@ timeout_minutes: 15
 
 env:
   runner:
+    GH_TOKEN: "${GH_TOKEN}"
     REPO_FULL_NAME: "${REPO_FULL_NAME}"
     PR_NUMBER: "${PR_NUMBER}"
     HEAD_SHA: "${HEAD_SHA}"
@@ -66,20 +70,3 @@ env:
     HEAD_SHA: "${HEAD_SHA}"
     MAX_RETRIES: "1"
     TIMEOUT_SECONDS: "900"
-
-forge:
-  github:
-    pre_script: scripts/pre-ci-diagnose.sh
-    post_script: scripts/post-ci-diagnose.sh
-    env:
-      runner:
-        GH_TOKEN: "${GH_TOKEN}"
-        REPO_FULL_NAME: "${REPO_FULL_NAME}"
-        PR_NUMBER: "${PR_NUMBER}"
-        HEAD_SHA: "${HEAD_SHA}"
-        CHECK_CONTEXT_FILE: /tmp/workspace/check-context.json
-      sandbox:
-        REPO_FULL_NAME: "${REPO_FULL_NAME}"
-        PR_NUMBER: "${PR_NUMBER}"
-        HEAD_SHA: "${HEAD_SHA}"
-        CHECK_CONTEXT_FILE: /sandbox/workspace/check-context.json
