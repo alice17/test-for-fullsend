@@ -19,28 +19,35 @@ GitHub pull requests.
 ## Behavior
 
 1. **Pre-script** (`scripts/pre-ci-diagnose.sh`) collects PR failing-check
-   context into `check-context.json` (failing check runs + commit statuses,
-   plus retry-budget counters read from prior sticky comments)
-2. **Agent** filters GitHub Actions checks, diagnoses failures, classifies
+   context into `check-context.json` (failing check runs, commit statuses,
+   workflow log excerpts, and retry-budget counters read from prior sticky
+   comments)
+2. **Agent** analyses the pre-fetched context, diagnoses failures, classifies
    `flaky` / `infra` / `code` / `unknown`, writes validated JSON
 3. **Post-script** (`scripts/post-ci-diagnose.sh`) posts a sticky PR comment
    via `fullsend post-comment` and may re-request flaky check runs within a
    retry budget (`MAX_FLAKE_RETRIES`, default `1`; confidence ≥ `0.7`)
 
-The agent never posts comments or re-runs checks itself (Fullsend sandbox
-security model). LLM inference uses Vertex AI credentials delivered via
-`host_files`.
+The sandbox has **no GitHub token** and **no external API access** (only Vertex
+AI for inference). All network reads happen in the pre-script; all network
+writes happen in the post-script.
 
 ### `check-context.json` shape
 
 Written by the pre-script to `CHECK_CONTEXT_FILE`
-(default `/tmp/workspace/check-context.json`):
+(default `/tmp/workspace/check-context.json`). The harness mounts that path into
+the sandbox via `host_files` with `optional: true`, because Fullsend validates
+`host_files` before the pre-script runs:
 
 - `repo_full_name`, `pr_number`, `head_sha`, `pr_url`, `pr_title`
+  (`head_sha` is always refreshed from the PR head; a stale `HEAD_SHA` env
+  value is ignored with a warning)
 - `failing_checks[]` — check runs with failing conclusions (`failure`,
   `timed_out`, `cancelled`, `action_required`, `startup_failure`), including
   `check_run_id`, `details_url`, and truncated `output_text`
 - `failing_statuses[]` — commit statuses in `failure` / `error` state
+- `workflow_logs` — object keyed by workflow run ID (string) with truncated
+  failed-job log excerpts as values (max `LOG_EXCERPT_MAX` chars, default 8000)
 - `retry_budget` — `{ max_flake_retries, retries_used, retries_remaining }`
 
 ## Triggers (planned)

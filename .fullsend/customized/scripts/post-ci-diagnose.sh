@@ -8,7 +8,7 @@
 # Required env:
 #   REPO_FULL_NAME — owner/repo
 #   PR_NUMBER      — pull request number
-#   GH_TOKEN       — GitHub token with pull-requests:write and checks:write
+#   GH_TOKEN       — GitHub token with pull-requests:write and actions:write
 #
 # Optional env:
 #   CHECK_CONTEXT_FILE     — pre-script context (default: /tmp/workspace/check-context.json)
@@ -17,9 +17,11 @@
 #   MIN_RETRY_CONFIDENCE   — minimum confidence to retry (default: 0.7)
 set -euo pipefail
 
+# Marker used by fullsend post-comment to upsert a sticky diagnosis comment.
 COMMENT_MARKER='<!-- fullsend:ci-diagnose -->'
 RESULT_NAME="${FULLSEND_OUTPUT_FILE:-ci-diagnose-result.json}"
 
+# Fail fast if a required CLI tool is missing from PATH.
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "::error::Required command not found: $1"
@@ -27,6 +29,7 @@ require_cmd() {
   fi
 }
 
+# Fail fast if a required environment variable is unset or empty.
 require_env() {
   local name="$1"
   if [[ -z "${!name:-}" ]]; then
@@ -35,6 +38,8 @@ require_env() {
   fi
 }
 
+# Locate the agent's diagnosis JSON. Prefer the validated iteration dir, then
+# FULLSEND_OUTPUT_DIR, then the newest matching iteration-* path on disk.
 find_result_file() {
   local candidate
   if [[ -n "${FULLSEND_VALIDATED_ITERATION_DIR:-}" ]]; then
@@ -73,6 +78,7 @@ find_result_file() {
   exit 1
 }
 
+# retries_used from pre-script check-context.json (defaults to 0 if missing).
 retries_used_from_context() {
   local context_file="${CHECK_CONTEXT_FILE:-/tmp/workspace/check-context.json}"
   if [[ -f "${context_file}" ]]; then
@@ -82,6 +88,7 @@ retries_used_from_context() {
   printf '0'
 }
 
+# True when the agent recommends a flake retry and budget/confidence allow it.
 should_retry() {
   local result_file="$1"
   local retries_used="$2"
@@ -100,6 +107,8 @@ should_retry() {
     ' "${result_file}" >/dev/null 2>&1
 }
 
+# Build the PR comment: agent markdown + optional retry note + retries marker
+# so the next pre-script can advance the flake budget.
 build_comment_body() {
   local result_file="$1"
   local retries_used="$2"
@@ -127,6 +136,7 @@ build_comment_body() {
   }
 }
 
+# Prefer sticky upsert via fullsend CLI; fall back to a plain gh PR comment.
 post_sticky_comment() {
   local body_file="$1"
   local token="${GH_TOKEN}"
@@ -146,6 +156,9 @@ post_sticky_comment() {
   gh pr comment "${PR_NUMBER}" --repo "${REPO_FULL_NAME}" --body-file "${body_file}"
 }
 
+# Re-run each job listed in retry_targets via the Actions API. The check_run_id
+# for GitHub Actions jobs doubles as the job_id. Succeeds if at least one
+# re-run works (partial success still counts as a retry attempt).
 rerequest_targets() {
   local result_file="$1"
   local id name err_output
@@ -158,14 +171,14 @@ rerequest_targets() {
       fail_count=$((fail_count + 1))
       continue
     fi
-    echo "::notice::Re-requesting check run ${id} (${name})"
-    if err_output="$(gh api -X POST "repos/${REPO_FULL_NAME}/check-runs/${id}/rerequest" 2>&1)"; then
+    echo "::notice::Re-running job ${id} (${name})"
+    if err_output="$(gh api -X POST "repos/${REPO_FULL_NAME}/actions/jobs/${id}/rerun" 2>&1)"; then
       ok_count=$((ok_count + 1))
     else
-      echo "::warning::Failed to re-request check run ${id} (${name}): ${err_output}"
+      echo "::warning::Failed to re-run job ${id} (${name}): ${err_output}"
       fail_count=$((fail_count + 1))
     fi
-  done < <(jq -r '.retry_targets[] | [(.check_run_id // "null")|tostring, .check_name] | @tsv' "${result_file}")
+  done < <(jq -r '.retry_targets[] | [((.check_run_id // "null")|tostring), .check_name] | @tsv' "${result_file}")
 
   echo "::notice::Retry summary: ok=${ok_count} failed=${fail_count}"
   if [[ "${ok_count}" -eq 0 ]]; then
@@ -182,6 +195,7 @@ main() {
   require_env GH_TOKEN
   export GH_TOKEN
 
+  # 1) Load and validate agent output
   local result_file retries_used did_retry retry_note body_file
   result_file="$(find_result_file)"
   echo "::notice::Reading diagnosis result from ${result_file}"
@@ -191,6 +205,7 @@ main() {
     exit 1
   fi
 
+  # 2) Decide whether to re-request flaky checks (trusted side effects only)
   retries_used="$(retries_used_from_context)"
   retries_used="$(printf '%s' "${retries_used}" | tr -d '[:space:]')"
   if [[ ! "${retries_used}" =~ ^[0-9]+$ ]]; then
@@ -216,6 +231,7 @@ main() {
     fi
   fi
 
+  # 3) Post sticky diagnosis comment (includes updated retries marker)
   body_file="$(mktemp)"
   build_comment_body "${result_file}" "${retries_used}" "${did_retry}" "${retry_note}" >"${body_file}"
   echo "::notice::Posting diagnosis comment on ${REPO_FULL_NAME}#${PR_NUMBER}"

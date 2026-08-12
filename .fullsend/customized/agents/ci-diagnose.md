@@ -5,7 +5,7 @@ description: >-
   failures, and produce a structured result for comment and optional retry.
 skills:
   - classify-ci-failure
-tools: Bash(gh,jq)
+tools: Bash(jq)
 model: opus
 ---
 
@@ -27,12 +27,16 @@ The post-script performs all side effects from your JSON output.
 
 Environment / host files set by the pre-script:
 
-- `CHECK_CONTEXT_FILE` — path to JSON with PR metadata and failing checks
-  (default: `/sandbox/workspace/check-context.json`)
+- `CHECK_CONTEXT_FILE` — path to JSON with PR metadata, failing checks, and
+  pre-fetched workflow logs (default: `/sandbox/workspace/check-context.json`)
 - `REPO_FULL_NAME` — `owner/repo`
 - `PR_NUMBER` — pull request number
 - `HEAD_SHA` — PR head commit SHA
 - `FULLSEND_OUTPUT_DIR` — directory for the result file
+
+You have **no GitHub token** and **no network access** to external APIs.
+All check metadata and workflow logs are pre-fetched by the runner and
+available in the context file. Do not attempt to call `gh` or any API.
 
 ## Process
 
@@ -58,11 +62,15 @@ Ignore non-Actions noise when present:
 - Dependabot security alerts (unless they are the only failures and block merge)
 - `dco`
 - Third-party status checks unrelated to Actions workflows
+- **Fullsend dispatch routing jobs** — checks named `dispatch / <Stage>`
+  (e.g. `dispatch / Retro`, `dispatch / Prioritize`) that were skipped or
+  cancelled because the stage role is not enabled in `.fullsend/config.yaml`.
+  These are expected no-ops, not failures. Do **not** classify them as `infra`.
 
 Prefer debugging build/test job failures before deployment or optional jobs
 when both are present.
 
-### Phase 3: Map checks to workflow runs
+### Phase 3: Map checks to workflow runs and read logs
 
 For each failing GitHub Actions check:
 
@@ -71,9 +79,15 @@ For each failing GitHub Actions check:
    `https://github.com/{owner}/{repo}/actions/runs/{run_id}/job/{job_id}`
 3. Record `workflow_run_url`, `workflow_run_id`, and `job_name` (check name)
    in each failure entry
-4. When helpful and available via `gh`, fetch failed-job log snippets:
-   `gh run view <run_id> --repo "$REPO_FULL_NAME" --log-failed`
-   (keep excerpts short; do not dump entire logs into the result)
+4. Read the pre-fetched log excerpt from `workflow_logs` in the context file:
+
+```bash
+jq -r '.workflow_logs["<run_id>"] // "no logs available"' "$CHECK_CONTEXT_FILE"
+```
+
+The `workflow_logs` object is keyed by workflow run ID (string) with the
+failed-job log excerpt as the value. Use these for diagnosis — do not
+attempt to fetch logs via network calls.
 
 ### Phase 4: Diagnose and classify
 

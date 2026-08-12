@@ -50,6 +50,13 @@ Decide the primary failure class and whether the post-script should retry.
 - Only cancelled checks (often downstream of another failure)
 - Conflicting signals
 
+### Exclude entirely (do not classify)
+
+- Fullsend dispatch routing jobs (`dispatch / <Stage>`) that are skipped or
+  cancelled because the stage role is not enabled in the repo config. These are
+  **not** infrastructure failures — they are intentional no-ops from the
+  dispatch role gate. Drop them before classification.
+
 ## Confidence guidance
 
 - High (≥ 0.8): clear signature + corroborating evidence

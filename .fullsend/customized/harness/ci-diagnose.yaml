@@ -6,8 +6,8 @@
 #   agent       : diagnose failures, classify flaky/infra/code, write JSON result
 #   post_script : post PR comment; optionally re-run flaky checks within budget
 #
-# The agent NEVER re-runs checks or posts comments (disallowedTools enforces this).
-# Only the post-script, running on the runner with GH_TOKEN, can write.
+# The agent has NO GitHub token and NO external API access.
+# All reads happen in the pre-script; all writes happen in the post-script.
 # Inference: Google Cloud Vertex AI (credentials via host_files below).
 agent: agents/ci-diagnose.md
 doc: docs/agent.md
@@ -30,8 +30,11 @@ host_files:
   - src: env/ci-diagnose.env
     dest: /sandbox/workspace/.env.d/ci-diagnose.env
     expand: true
+  # Produced by pre_script; must be optional so ValidateFilesExist can pass
+  # before the pre-script runs. Mounted into the sandbox after creation.
   - src: /tmp/workspace/check-context.json
     dest: /sandbox/workspace/check-context.json
+    optional: true
 
 skills:
   - skills/classify-ci-failure
@@ -76,7 +79,6 @@ forge:
         HEAD_SHA: "${HEAD_SHA}"
         CHECK_CONTEXT_FILE: /tmp/workspace/check-context.json
       sandbox:
-        GH_TOKEN: "${GH_TOKEN}"
         REPO_FULL_NAME: "${REPO_FULL_NAME}"
         PR_NUMBER: "${PR_NUMBER}"
         HEAD_SHA: "${HEAD_SHA}"
