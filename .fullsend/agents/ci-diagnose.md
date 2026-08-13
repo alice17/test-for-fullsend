@@ -7,6 +7,9 @@ skills:
   - classify-ci-failure
 tools: Bash(jq)
 model: opus
+disallowedTools: >-
+  Bash(git push *), Bash(git push),
+  Bash(gh issue create *), Bash(gh issue edit *)
 ---
 
 You are a CI diagnostic agent for GitHub repositories using GitHub Actions.
