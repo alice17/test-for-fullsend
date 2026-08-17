@@ -33,8 +33,6 @@ host_files:
   - src: env/ci-diagnose.env
     dest: /sandbox/workspace/.env.d/ci-diagnose.env
     expand: true
-  # Produced by pre_script; must be optional so ValidateFilesExist can pass
-  # before the pre-script runs. Mounted into the sandbox after creation.
   - src: /tmp/workspace/check-context.json
     dest: /sandbox/workspace/check-context.json
     optional: true
@@ -59,11 +57,11 @@ env:
     PR_NUMBER: "${PR_NUMBER}"
     HEAD_SHA: "${HEAD_SHA}"
     CHECK_CONTEXT_FILE: /tmp/workspace/check-context.json
-    FULLSEND_OUTPUT_SCHEMA: ${FULLSEND_DIR}/schemas/ci-diagnose-result.schema.json
     FULLSEND_OUTPUT_FILE: ci-diagnose-result.json
     MAX_FLAKE_RETRIES: "${MAX_FLAKE_RETRIES}"
     MIN_RETRY_CONFIDENCE: "${MIN_RETRY_CONFIDENCE}"
   sandbox:
+    ANTHROPIC_VERTEX_PROJECT_ID: "${ANTHROPIC_VERTEX_PROJECT_ID}"
     CHECK_CONTEXT_FILE: /sandbox/workspace/check-context.json
     REPO_FULL_NAME: "${REPO_FULL_NAME}"
     PR_NUMBER: "${PR_NUMBER}"
