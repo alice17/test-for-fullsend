@@ -136,24 +136,56 @@ build_comment_body() {
   }
 }
 
-# Prefer sticky upsert via fullsend CLI; fall back to a plain gh PR comment.
+# Upsert via Pull Requests / GraphQL APIs. Fine-grained PATs with
+# pull-requests:write but not Issues cannot list comments over REST
+# (GitHub returns 404), which is what `fullsend post-comment` uses.
+upsert_pr_comment() {
+  local body_file="$1"
+  local marked_file comment_id
+  marked_file="$(mktemp)"
+  {
+    printf '%s\n' "${COMMENT_MARKER}"
+    cat "${body_file}"
+  } >"${marked_file}"
+
+  comment_id="$(
+    gh pr view "${PR_NUMBER}" --repo "${REPO_FULL_NAME}" --json comments \
+      --jq "[.comments[] | select(.body | contains(\"${COMMENT_MARKER}\")) | .id] | last // empty"
+  )"
+
+  if [[ -n "${comment_id}" && "${comment_id}" != "null" ]]; then
+    echo "::notice::Updating existing diagnosis comment"
+    jq -n --rawfile body "${marked_file}" --arg id "${comment_id}" '{
+      query: "mutation($id: ID!, $body: String!) { updateIssueComment(input: {id: $id, body: $body}) { issueComment { url } } }",
+      variables: {id: $id, body: $body}
+    }' | gh api graphql --input -
+  else
+    echo "::notice::Creating diagnosis comment"
+    gh pr comment "${PR_NUMBER}" --repo "${REPO_FULL_NAME}" --body-file "${marked_file}"
+  fi
+  rm -f "${marked_file}"
+}
+
+# Prefer fullsend sticky upsert when the Issues comments REST API works
+# (classic tokens / GITHUB_TOKEN). Otherwise GraphQL upsert.
 post_sticky_comment() {
   local body_file="$1"
-  local token="${GH_TOKEN}"
-  export GITHUB_TOKEN="${token}"
+  export GITHUB_TOKEN="${GH_TOKEN}"
 
-  if command -v fullsend >/dev/null 2>&1; then
+  if command -v fullsend >/dev/null 2>&1 \
+     && gh api "repos/${REPO_FULL_NAME}/issues/${PR_NUMBER}/comments" \
+          --jq 'length' >/dev/null 2>&1; then
     fullsend post-comment \
       --repo "${REPO_FULL_NAME}" \
       --number "${PR_NUMBER}" \
       --marker "${COMMENT_MARKER}" \
-      --token "${token}" \
+      --token "${GH_TOKEN}" \
       --result "${body_file}"
     return 0
   fi
 
-  echo "::warning::fullsend CLI unavailable; posting a non-sticky PR comment"
-  gh pr comment "${PR_NUMBER}" --repo "${REPO_FULL_NAME}" --body-file "${body_file}"
+  echo "::notice::Issues comments REST unavailable; upserting via Pull Requests API"
+  upsert_pr_comment "${body_file}"
 }
 
 # Re-run each job listed in retry_targets via the Actions API. The check_run_id

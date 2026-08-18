@@ -7,7 +7,9 @@
 # Required env:
 #   REPO_FULL_NAME — owner/repo
 #   PR_NUMBER      — pull request number
-#   GH_TOKEN       — GitHub token with checks:read (and pull-requests:read)
+#   GH_TOKEN       — GitHub token with pull-requests:read, checks:read, and
+#                    actions:read. Fine-grained PATs do not need Issues
+#                    permission; retry markers are read via `gh pr view`.
 #
 # Optional env:
 #   HEAD_SHA            — hint only; always refreshed from the PR head when
@@ -62,30 +64,33 @@ resolve_head_sha() {
 }
 
 # Read the highest <!-- fullsend:ci-diagnose-retries:N --> marker from PR
-# comments so the agent knows how many flake retries have already been used.
+# conversation comments so the agent knows how many flake retries were used.
+# Uses `gh pr view` (Pull Requests API). The Issues comments REST endpoint
+# 404s for fine-grained PATs that have pull-requests:read but not Issues.
 read_retries_used() {
   local max_seen api_output
-  api_output="$(
-    gh api --paginate "repos/${REPO_FULL_NAME}/issues/${PR_NUMBER}/comments" \
-      --jq '
-        [.[].body
-          | capture("<!-- fullsend:ci-diagnose-retries:(?<n>[0-9]+) -->")?
-          | .n
-          | tonumber
-        ]
-        | if length == 0 then 0 else max end
-      '
-  )" || {
-    echo "::error::Failed to read PR comments for retry tracking on ${REPO_FULL_NAME}#${PR_NUMBER}"
-    exit 1
-  }
-  # Normalize multi-line / empty API noise to a single integer.
-  max_seen="$(printf '%s' "${api_output}" | tr -d '[:space:]')"
-  if [[ ! "${max_seen}" =~ ^[0-9]+$ ]]; then
-    echo "::error::Unexpected non-integer retries value: '${max_seen}'"
-    exit 1
+  if api_output="$(
+    gh pr view "${PR_NUMBER}" --repo "${REPO_FULL_NAME}" --json comments --jq '
+      [.comments[].body // empty
+        | strings
+        | capture("<!-- fullsend:ci-diagnose-retries:(?<n>[0-9]+) -->")?
+        | .n
+        | tonumber
+      ]
+      | if length == 0 then 0 else max end
+    '
+  )"; then
+    max_seen="$(printf '%s' "${api_output}" | tr -d '[:space:]')"
+    if [[ "${max_seen}" =~ ^[0-9]+$ ]]; then
+      printf '%s' "${max_seen}"
+      return 0
+    fi
+    echo "::warning::Unexpected non-integer retries value: '${max_seen}'; defaulting retries_used=0" >&2
+    printf '0'
+    return 0
   fi
-  printf '%s' "${max_seen}"
+  echo "::warning::Failed to read PR comments for retry tracking; defaulting retries_used=0" >&2
+  printf '0'
 }
 
 # List check runs for HEAD_SHA, keep only real failures, and write a trimmed
@@ -311,6 +316,9 @@ main() {
 
   failing_count="$(jq 'length' "${checks_json}")"
   echo "::notice::Wrote ${CHECK_CONTEXT_FILE} (${failing_count} failing check runs; retries_used=${retries_used})"
+  echo "::group::${CHECK_CONTEXT_FILE}"
+  jq . "${CHECK_CONTEXT_FILE}"
+  echo "::endgroup::"
 
   rm -f "${raw_checks}" "${checks_json}" "${statuses_json}"
   rm -rf "${logs_dir}"
