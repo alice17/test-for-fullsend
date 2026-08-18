@@ -4,7 +4,8 @@
 # This file configures fullsend for per-repo installation mode.
 # See ADR 0033 for details.
 version: "1"
-roles: []
+roles:
+    - ci-diagnose
 agents:
   - name: ci-diagnose
     source: harness/ci-diagnose.yaml
