@@ -25,12 +25,22 @@ GitHub pull requests.
 2. **Agent** analyses the pre-fetched context, diagnoses failures, classifies
    `flaky` / `infra` / `code` / `unknown`, writes validated JSON
 3. **Post-script** (`scripts/post-ci-diagnose.sh`) posts a sticky PR comment
-   via `fullsend post-comment` and may re-request flaky check runs within a
+   (`fullsend post-comment` when Issues comments REST works; otherwise
+   GraphQL / `gh pr comment` for fine-grained PATs with only
+   `pull-requests:write`) and may re-request flaky check runs within a
    retry budget (`MAX_FLAKE_RETRIES`, default `1`; confidence ≥ `0.7`)
 
 The sandbox has **no GitHub token** and **no external API access** (only Vertex
 AI for inference). All network reads happen in the pre-script; all network
 writes happen in the post-script.
+
+Do **not** set `tools` or `disallowedTools` in the agent frontmatter. Claude
+Code v2.1.119+ enforces those keys in `--agent` sessions, and scoped
+`Bash(...)` patterns can strip the entire Bash tool (the agent then
+hallucinates command output). Steering belongs in prompt constraints and
+sandbox policy; see
+[ADR 0027](https://github.com/fullsend-ai/fullsend/blob/main/docs/ADRs/0027-allowed-and-disallowed-tools-for-agents.md)
+and [discussion #5182](https://github.com/fullsend-ai/fullsend/discussions/5182).
 
 ### `check-context.json` shape
 
@@ -49,13 +59,20 @@ the sandbox via `host_files` with `optional: true`, because Fullsend validates
 - `workflow_logs` — object keyed by workflow run ID (string) with truncated
   failed-job log excerpts as values (max `LOG_EXCERPT_MAX` chars, default 8000)
 - `retry_budget` — `{ max_flake_retries, retries_used, retries_remaining }`
+  (`retries_used` is read from sticky PR conversation comments via
+  `gh pr view`, not the Issues comments REST API, so a fine-grained PAT
+  with `pull-requests:read` is enough)
 
-## Triggers (planned)
+## Triggers
 
-- Slash command on a PR (e.g. `/ci-diagnose` or `/diagnose`)
-- Optional later: auto-run on GitHub Actions check failure for enrolled repos
+Dispatch runs this agent when a human comments `/fs-ci-diagnose` on a
+non-fork pull request. The CEL expression is on the harness `trigger`
+field ([CEL Triggers Reference](https://fullsend.sh/docs/guides/user/cel-triggers-reference.html)).
 
-Event wiring lives in the org/repo `.fullsend` config after registration.
+`fullsend run ci-diagnose` still works for local/manual runs.
+
+Not wired yet: auto-run on GitHub Actions check failure. The installed
+shim does not subscribe to `check_run` / `check_suite` events.
 
 ## Registration
 
