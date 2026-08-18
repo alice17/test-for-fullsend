@@ -8,6 +8,8 @@
 #
 # The agent has NO GitHub token and NO external API access.
 # All reads happen in the pre-script; all writes happen in the post-script.
+# Do not add tools/disallowedTools to the agent frontmatter — scoped Bash(...)
+# patterns strip Bash in Claude Code --agent sessions (fullsend#5182).
 # Inference: Google Cloud Vertex AI (credentials via host_files below).
 agent: agents/ci-diagnose.md
 doc: docs/agent.md
@@ -20,6 +22,13 @@ providers:
 
 role: ci-diagnose
 slug: ci-diagnose
+trigger: >
+  event.transition.kind == "comment_added"
+    && has(event.transition.comment.command)
+    && event.transition.comment.command == "/fs-ci-diagnose"
+    && event.entity.kind == "work_item"
+    && event.state.change_proposal != null
+    && !event.state.change_proposal.is_fork
 
 host_files:
   - src: env/gcp-vertex.env
