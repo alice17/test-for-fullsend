@@ -6,9 +6,12 @@
 # happen here — never inside the sandbox.
 #
 # Required env:
-#   REPO_FULL_NAME — owner/repo
-#   PR_NUMBER      — pull request number
-#   GH_TOKEN       — GitHub token with pull-requests:write and actions:write
+#   REPO_FULL_NAME   — owner/repo (set by dispatch)
+#   GH_TOKEN         — GitHub token with pull-requests:write and actions:write
+#   GITHUB_ISSUE_URL — issue or PR URL (set by dispatch or caller).
+#                      `gh pr comment` and `gh pr view` accept the URL.
+#                      A numeric id is extracted for REST and
+#                      `fullsend post-comment --number`.
 #
 # Optional env:
 #   CHECK_CONTEXT_FILE     — pre-script context (default: /tmp/workspace/check-context.json)
@@ -21,71 +24,42 @@ set -euo pipefail
 COMMENT_MARKER='<!-- fullsend:ci-diagnose -->'
 RESULT_NAME="${FULLSEND_OUTPUT_FILE:-ci-diagnose-result.json}"
 
-# Fail fast if a required CLI tool is missing from PATH.
-require_cmd() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    echo "::error::Required command not found: $1"
-    exit 1
+# Numeric id for REST paths and `fullsend post-comment --number`.
+pr_number_from_url() {
+  local url="${GITHUB_ISSUE_URL}"
+  if [[ "${url}" =~ /(issues|pull)/([0-9]+) ]]; then
+    printf '%s' "${BASH_REMATCH[2]}"
+    return 0
   fi
+  echo "::error::GITHUB_ISSUE_URL has no issue/PR number: ${url}"
+  exit 1
 }
 
-# Fail fast if a required environment variable is unset or empty.
-require_env() {
-  local name="$1"
-  if [[ -z "${!name:-}" ]]; then
-    echo "::error::Required environment variable not set: ${name}"
-    exit 1
-  fi
-}
-
-# Locate the agent's diagnosis JSON. Prefer the validated iteration dir, then
-# FULLSEND_OUTPUT_DIR, then the newest matching iteration-* path on disk.
+# Locate the agent's diagnosis JSON.
 find_result_file() {
   local candidate
-  if [[ -n "${FULLSEND_VALIDATED_ITERATION_DIR:-}" ]]; then
-    for candidate in \
-      "${FULLSEND_VALIDATED_ITERATION_DIR}/${RESULT_NAME}" \
-      "${FULLSEND_VALIDATED_ITERATION_DIR}/output/${RESULT_NAME}" \
-      "${FULLSEND_VALIDATED_ITERATION_DIR}/agent-result.json" \
-      "${FULLSEND_VALIDATED_ITERATION_DIR}/result.json"
-    do
-      if [[ -f "${candidate}" ]]; then
-        printf '%s' "${candidate}"
-        return 0
-      fi
-    done
-    echo "::error::FULLSEND_VALIDATED_ITERATION_DIR set but result not found"
-    exit 1
-  fi
-
-  if [[ -n "${FULLSEND_OUTPUT_DIR:-}" && -f "${FULLSEND_OUTPUT_DIR}/${RESULT_NAME}" ]]; then
-    printf '%s' "${FULLSEND_OUTPUT_DIR}/${RESULT_NAME}"
-    return 0
-  fi
-
-  local found=""
-  for candidate in iteration-*/output/"${RESULT_NAME}" iteration-*/"${RESULT_NAME}"; do
-    if [[ -f "${candidate}" ]]; then
-      found="${candidate}"
-    fi
+  for candidate in \
+    ${FULLSEND_VALIDATED_ITERATION_DIR:+"${FULLSEND_VALIDATED_ITERATION_DIR}/output/${RESULT_NAME}"} \
+    iteration-*/output/"${RESULT_NAME}"
+  do
+    [[ -f "${candidate}" ]] && { printf '%s' "${candidate}"; return 0; }
   done
-  if [[ -n "${found}" ]]; then
-    printf '%s' "${found}"
-    return 0
-  fi
-
-  echo "::error::Result file ${RESULT_NAME} not found in iteration output"
+  echo "::error::Result file ${RESULT_NAME} not found"
   exit 1
 }
 
 # retries_used from pre-script check-context.json (defaults to 0 if missing).
 retries_used_from_context() {
   local context_file="${CHECK_CONTEXT_FILE:-/tmp/workspace/check-context.json}"
+  local raw
   if [[ -f "${context_file}" ]]; then
-    jq -r '.retry_budget.retries_used // 0' "${context_file}"
-    return 0
+    raw="$(jq -r '.retry_budget.retries_used // 0' "${context_file}" | tr -d '[:space:]')"
   fi
-  printf '0'
+  if [[ "${raw:-}" =~ ^[0-9]+$ ]]; then
+    printf '%s' "${raw}"
+  else
+    printf '0'
+  fi
 }
 
 # True when the agent recommends a flake retry and budget/confidence allow it.
@@ -107,85 +81,16 @@ should_retry() {
     ' "${result_file}" >/dev/null 2>&1
 }
 
-# Build the PR comment: agent markdown + optional retry note + retries marker
-# so the next pre-script can advance the flake budget.
-build_comment_body() {
-  local result_file="$1"
-  local retries_used="$2"
-  local did_retry="$3"
-  local retry_note="$4"
-  local new_retries="${retries_used}"
-  local body
-
-  if [[ "${did_retry}" == "true" ]]; then
-    new_retries=$((retries_used + 1))
-  fi
-
-  body="$(jq -r '.pr_comment_markdown' "${result_file}")"
-  if [[ -z "${body}" || "${body}" == "null" ]]; then
-    echo "::error::Result missing pr_comment_markdown"
-    exit 1
-  fi
-
-  {
-    printf '%s\n' "${body}"
-    if [[ -n "${retry_note}" ]]; then
-      printf '\n---\n%s\n' "${retry_note}"
-    fi
-    printf '\n<!-- fullsend:ci-diagnose-retries:%s -->\n' "${new_retries}"
-  }
-}
-
-# Upsert via Pull Requests / GraphQL APIs. Fine-grained PATs with
-# pull-requests:write but not Issues cannot list comments over REST
-# (GitHub returns 404), which is what `fullsend post-comment` uses.
-upsert_pr_comment() {
-  local body_file="$1"
-  local marked_file comment_id
-  marked_file="$(mktemp)"
-  {
-    printf '%s\n' "${COMMENT_MARKER}"
-    cat "${body_file}"
-  } >"${marked_file}"
-
-  comment_id="$(
-    gh pr view "${PR_NUMBER}" --repo "${REPO_FULL_NAME}" --json comments \
-      --jq "[.comments[] | select(.body | contains(\"${COMMENT_MARKER}\")) | .id] | last // empty"
-  )"
-
-  if [[ -n "${comment_id}" && "${comment_id}" != "null" ]]; then
-    echo "::notice::Updating existing diagnosis comment"
-    jq -n --rawfile body "${marked_file}" --arg id "${comment_id}" '{
-      query: "mutation($id: ID!, $body: String!) { updateIssueComment(input: {id: $id, body: $body}) { issueComment { url } } }",
-      variables: {id: $id, body: $body}
-    }' | gh api graphql --input -
-  else
-    echo "::notice::Creating diagnosis comment"
-    gh pr comment "${PR_NUMBER}" --repo "${REPO_FULL_NAME}" --body-file "${marked_file}"
-  fi
-  rm -f "${marked_file}"
-}
-
-# Prefer fullsend sticky upsert when the Issues comments REST API works
-# (classic tokens / GITHUB_TOKEN). Otherwise GraphQL upsert.
+# Post a sticky diagnosis comment via fullsend post-comment.
 post_sticky_comment() {
   local body_file="$1"
   export GITHUB_TOKEN="${GH_TOKEN}"
-
-  if command -v fullsend >/dev/null 2>&1 \
-     && gh api "repos/${REPO_FULL_NAME}/issues/${PR_NUMBER}/comments" \
-          --jq 'length' >/dev/null 2>&1; then
-    fullsend post-comment \
-      --repo "${REPO_FULL_NAME}" \
-      --number "${PR_NUMBER}" \
-      --marker "${COMMENT_MARKER}" \
-      --token "${GH_TOKEN}" \
-      --result "${body_file}"
-    return 0
-  fi
-
-  echo "::notice::Issues comments REST unavailable; upserting via Pull Requests API"
-  upsert_pr_comment "${body_file}"
+  fullsend post-comment \
+    --repo "${REPO_FULL_NAME}" \
+    --number "$(pr_number_from_url)" \
+    --marker "${COMMENT_MARKER}" \
+    --token "${GH_TOKEN}" \
+    --result "${body_file}"
 }
 
 # Re-run each job listed in retry_targets via the Actions API. The check_run_id
@@ -220,11 +125,11 @@ rerequest_targets() {
 }
 
 main() {
-  require_cmd gh
-  require_cmd jq
-  require_env REPO_FULL_NAME
-  require_env PR_NUMBER
-  require_env GH_TOKEN
+  command -v gh >/dev/null || { echo "::error::gh not found"; exit 1; }
+  command -v jq >/dev/null || { echo "::error::jq not found"; exit 1; }
+  : "${REPO_FULL_NAME:?Required env REPO_FULL_NAME is not set}"
+  : "${GH_TOKEN:?Required env GH_TOKEN is not set}"
+  : "${GITHUB_ISSUE_URL:?Required env GITHUB_ISSUE_URL is not set}"
   export GH_TOKEN
 
   # 1) Load and validate agent output
@@ -239,10 +144,6 @@ main() {
 
   # 2) Decide whether to re-request flaky checks (trusted side effects only)
   retries_used="$(retries_used_from_context)"
-  retries_used="$(printf '%s' "${retries_used}" | tr -d '[:space:]')"
-  if [[ ! "${retries_used}" =~ ^[0-9]+$ ]]; then
-    retries_used=0
-  fi
 
   did_retry="false"
   retry_note=""
@@ -263,10 +164,23 @@ main() {
     fi
   fi
 
-  # 3) Post sticky diagnosis comment (includes updated retries marker)
+  # 3) Build and post sticky diagnosis comment (includes updated retries marker)
+  local body new_retries
+  body="$(jq -r '.pr_comment_markdown' "${result_file}")"
+  if [[ -z "${body}" || "${body}" == "null" ]]; then
+    echo "::error::Result missing pr_comment_markdown"
+    exit 1
+  fi
+  new_retries="${retries_used}"
+  [[ "${did_retry}" == "true" ]] && new_retries=$((retries_used + 1))
+
   body_file="$(mktemp)"
-  build_comment_body "${result_file}" "${retries_used}" "${did_retry}" "${retry_note}" >"${body_file}"
-  echo "::notice::Posting diagnosis comment on ${REPO_FULL_NAME}#${PR_NUMBER}"
+  {
+    printf '%s\n' "${body}"
+    [[ -n "${retry_note}" ]] && printf '\n---\n%s\n' "${retry_note}"
+    printf '\n<!-- fullsend:ci-diagnose-retries:%s -->\n' "${new_retries}"
+  } >"${body_file}"
+  echo "::notice::Posting diagnosis comment on ${GITHUB_ISSUE_URL}"
   post_sticky_comment "${body_file}"
   rm -f "${body_file}"
   echo "::notice::ci-diagnose post-script complete"
