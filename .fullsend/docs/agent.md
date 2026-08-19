@@ -8,8 +8,9 @@ GitHub pull requests.
 
 | Field | Value |
 |-------|-------|
-| Role | `ci-diagnose` |
-| Slug | `ci-diagnose` |
+| Role | `review` (hosted mint identity) |
+| Registration name | `review` (must match a hosted mint role; see status comments) |
+| Slug | `fullsend-ai-review` |
 | Forge | GitHub (`forge.github`) |
 | Inference | Google Cloud Vertex AI |
 | Harness | [`harness/ci-diagnose.yaml`](../harness/ci-diagnose.yaml) |
@@ -22,17 +23,24 @@ GitHub pull requests.
    context into `check-context.json` (failing check runs, commit statuses,
    workflow log excerpts, and retry-budget counters read from prior sticky
    comments)
-2. **Agent** analyses the pre-fetched context, diagnoses failures, classifies
-   `flaky` / `infra` / `code` / `unknown`, writes validated JSON
+2. **Agent** analyses the pre-fetched context — workflow logs and per-check
+   `output_title`/`output_summary`/`output_text` fields — diagnoses
+   failures, classifies each as `flaky` / `infra` / `code` / `unknown`
+   with per-failure confidence, and writes validated JSON. Classification
+   logic is in the `classify-ci-failure` skill; the agent prompt delegates
+   to it rather than duplicating the rules
 3. **Post-script** (`scripts/post-ci-diagnose.sh`) posts a sticky PR comment
-   (`fullsend post-comment` when Issues comments REST works; otherwise
-   GraphQL / `gh pr comment` for fine-grained PATs with only
-   `pull-requests:write`) and may re-request flaky check runs within a
-   retry budget (`MAX_FLAKE_RETRIES`, default `1`; confidence ≥ `0.7`)
+   via `fullsend post-comment` and may re-request **only the individually
+   flaky** check runs within a retry budget (`MAX_FLAKE_RETRIES`, default
+   `1`; confidence ≥ `0.7`; `retries_remaining > 0`)
 
 The sandbox has **no GitHub token** and **no external API access** (only Vertex
 AI for inference). All network reads happen in the pre-script; all network
-writes happen in the post-script.
+writes happen in the post-script. The agent prompt is runtime-agnostic
+(references "available tools" rather than a specific inference provider).
+
+The `model` is set in the harness (`ci-diagnose.yaml`), not in the agent
+frontmatter, to avoid divergence.
 
 Do **not** set `tools` or `disallowedTools` in the agent frontmatter. Claude
 Code v2.1.119+ enforces those keys in `--agent` sessions, and scoped
@@ -54,7 +62,8 @@ the sandbox via `host_files` with `optional: true`, because Fullsend validates
   value is ignored with a warning)
 - `failing_checks[]` — check runs with failing conclusions (`failure`,
   `timed_out`, `cancelled`, `action_required`, `startup_failure`), including
-  `check_run_id`, `details_url`, and truncated `output_text`
+  `check_run_id`, `details_url`, truncated `output_text`, `output_title`,
+  and `output_summary`
 - `failing_statuses[]` — commit statuses in `failure` / `error` state
 - `workflow_logs` — object keyed by workflow run ID (string) with truncated
   failed-job log excerpts as values (max `LOG_EXCERPT_MAX` chars, default 8000)
@@ -63,17 +72,65 @@ the sandbox via `host_files` with `optional: true`, because Fullsend validates
   `gh pr view`, not the Issues comments REST API, so a fine-grained PAT
   with `pull-requests:read` is enough)
 
+### Result schema
+
+The result JSON (`ci-diagnose-result.schema.json`) includes both top-level
+and per-failure classification:
+
+- **Top-level** `classification` / `confidence` — the rollup used by the
+  post-script to gate retries
+- **Per-failure** `classification` / `confidence` — individual diagnosis per
+  check run, surfaced in the PR comment table
+
+The `retry_targets` array must contain **only** failures individually
+classified as `flaky`. Non-flaky failures are never retried, even when the
+overall classification is `flaky`.
+
+### PR comment format
+
+The `pr_comment_markdown` field uses a structured layout:
+
+1. **Failures table** — one row per failed job with check name (linked to
+   the run), root cause, classification, and confidence
+2. **Action** — whether a retry was performed and why/why not
+3. **Details** — additional context for the PR author
+
 ## Triggers
 
 Dispatch runs this agent when a human comments `/fs-ci-diagnose` on a
 non-fork pull request. The CEL expression is on the harness `trigger`
 field ([CEL Triggers Reference](https://fullsend.sh/docs/guides/user/cel-triggers-reference.html)).
 
-`fullsend run ci-diagnose` still works for local/manual runs.
+`fullsend run review` still works for local/manual runs (the
+registration name is `review` so hosted mint, including status-comment
+reconcile, accepts the role). Pass `GH_TOKEN`, `REPO_FULL_NAME`, and
+`GITHUB_ISSUE_URL`.
+The slash command is still `/fs-ci-diagnose`.
 
 Not wired yet: auto-run on GitHub Actions check failure. The installed
 shim does not subscribe to `check_run` / `check_suite` events.
 
-## Registration
+## Dispatch environment
 
-See [README.md](../README.md#registration).
+Custom harness agents run through `reusable-dispatch.yml` `harness-run`,
+which injects `GITHUB_ISSUE_URL`, `REPO_FULL_NAME`, and a minted `GH_TOKEN`.
+Pre/post scripts pass `GITHUB_ISSUE_URL` to `gh pr view` / `gh pr comment`.
+A numeric id is parsed from the URL only for REST paths and
+`fullsend post-comment --number`. `HEAD_SHA` is refreshed from
+`gh pr view --json headRefOid`. `MAX_FLAKE_RETRIES` and
+`MIN_RETRY_CONFIDENCE` are optional; the scripts default them to `1` and
+`0.7` when unset.
+
+## Status comments and mint role
+
+After `fullsend run`, the composite action always runs
+`fullsend reconcile-status --role <registration-name>` to close
+orphaned start comments. Hosted mint only allows canonical roles
+(`review`, `coder`, `triage`, …). A registration name like
+`ci-diagnose` returns HTTP 403 `role not allowed` even when the
+harness `role:` is `review` (that field is used for the agent token,
+not for reconcile).
+
+This agent is therefore registered as `review` in
+[`config.yaml`](../config.yaml). That does **not** enable the built-in
+review stage (`roles:` still omits `review`).
