@@ -13,7 +13,7 @@
 #
 # Optional env:
 #   CHECK_CONTEXT_FILE  — output path (default: /tmp/workspace/check-context.json)
-#   MAX_FLAKE_RETRIES   — retry budget recorded in context (default: 1)
+#   MAX_FLAKE_RETRIES   — retry budget recorded in context (default: 2)
 #   OUTPUT_TEXT_MAX     — max chars of check output text to keep (default: 4000)
 #   LOG_EXCERPT_MAX     — max chars per workflow run log excerpt (default: 8000)
 set -euo pipefail
@@ -192,7 +192,7 @@ write_check_context() {
   local statuses_path="$2"
   local retries_used="$3"
   local logs_dir="$4"
-  local max_retries="${MAX_FLAKE_RETRIES:-1}"
+  local max_retries="${MAX_FLAKE_RETRIES:-2}"
   local logs_json
 
   logs_json="$(

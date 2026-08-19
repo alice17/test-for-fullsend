@@ -16,7 +16,7 @@
 # Optional env:
 #   CHECK_CONTEXT_FILE     — pre-script context (default: /tmp/workspace/check-context.json)
 #   FULLSEND_OUTPUT_FILE   — result filename (default: ci-diagnose-result.json)
-#   MAX_FLAKE_RETRIES      — max automatic flake retries (default: 1)
+#   MAX_FLAKE_RETRIES      — max automatic flake retries (default: 2)
 #   MIN_RETRY_CONFIDENCE   — minimum confidence to retry (default: 0.7)
 set -euo pipefail
 
@@ -66,7 +66,7 @@ retries_used_from_context() {
 should_retry() {
   local result_file="$1"
   local retries_used="$2"
-  local max_retries="${MAX_FLAKE_RETRIES:-1}"
+  local max_retries="${MAX_FLAKE_RETRIES:-2}"
   local min_confidence="${MIN_RETRY_CONFIDENCE:-0.7}"
 
   jq -e \
@@ -151,7 +151,7 @@ main() {
   if should_retry "${result_file}" "${retries_used}"; then
     if rerequest_targets "${result_file}"; then
       did_retry="true"
-      retry_note="**Retry:** re-requested flaky check run(s) (attempt $((retries_used + 1))/${MAX_FLAKE_RETRIES:-1})."
+      retry_note="**Retry:** re-requested flaky check run(s) (attempt $((retries_used + 1))/${MAX_FLAKE_RETRIES:-2})."
     else
       retry_note="**Retry:** recommended, but no check runs could be re-requested."
     fi
@@ -160,7 +160,7 @@ main() {
     action="$(jq -r '.recommended_action' "${result_file}")"
     classification="$(jq -r '.classification' "${result_file}")"
     if [[ "${action}" == "retry" ]]; then
-      retry_note="**Retry:** skipped (classification=${classification}, retries_used=${retries_used}, max=${MAX_FLAKE_RETRIES:-1}, min_confidence=${MIN_RETRY_CONFIDENCE:-0.7})."
+      retry_note="**Retry:** skipped (classification=${classification}, retries_used=${retries_used}, max=${MAX_FLAKE_RETRIES:-2}, min_confidence=${MIN_RETRY_CONFIDENCE:-0.7})."
     fi
   fi
 
