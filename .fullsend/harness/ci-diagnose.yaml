@@ -63,8 +63,7 @@ env:
   runner:
     GH_TOKEN: "${GH_TOKEN}"
     REPO_FULL_NAME: "${REPO_FULL_NAME}"
-    PR_NUMBER: "${PR_NUMBER}"
-    HEAD_SHA: "${HEAD_SHA}"
+    GITHUB_ISSUE_URL: "${GITHUB_ISSUE_URL}"
     CHECK_CONTEXT_FILE: /tmp/workspace/check-context.json
     FULLSEND_OUTPUT_FILE: ci-diagnose-result.json
     MAX_FLAKE_RETRIES: "${MAX_FLAKE_RETRIES}"
@@ -73,7 +72,6 @@ env:
     ANTHROPIC_VERTEX_PROJECT_ID: "${ANTHROPIC_VERTEX_PROJECT_ID}"
     CHECK_CONTEXT_FILE: /sandbox/workspace/check-context.json
     REPO_FULL_NAME: "${REPO_FULL_NAME}"
-    PR_NUMBER: "${PR_NUMBER}"
-    HEAD_SHA: "${HEAD_SHA}"
+    GITHUB_ISSUE_URL: "${GITHUB_ISSUE_URL}"
     MAX_RETRIES: "1"
     TIMEOUT_SECONDS: "900"

@@ -28,13 +28,14 @@ The post-script performs all side effects from your JSON output.
 
 Environment / host files set by the pre-script:
 
-- `CHECK_CONTEXT_FILE` — path to JSON with PR metadata, failing checks, and
+- `CHECK_CONTEXT_FILE` — path to JSON with PR metadata (`repo_full_name`,
+  `pr_number`, `head_sha`, `pr_url`, `pr_title`), failing checks, and
   pre-fetched workflow logs (default: `/sandbox/workspace/check-context.json`)
-- `REPO_FULL_NAME` — `owner/repo`
-- `PR_NUMBER` — pull request number
-- `HEAD_SHA` — PR head commit SHA
 - `FULLSEND_OUTPUT_DIR` — directory for the result file (default:
   `/sandbox/workspace/output`; must write here or Fullsend cannot extract it)
+
+Read PR identity from `check-context.json`. Do not expect PR metadata as
+sandbox environment variables.
 
 You have **no GitHub token** and **no network access** to external APIs.
 All check metadata and workflow logs are pre-fetched by the runner and

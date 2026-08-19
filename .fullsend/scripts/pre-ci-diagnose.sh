@@ -5,62 +5,34 @@
 # Runs on the trusted runner before the sandbox starts.
 #
 # Required env:
-#   REPO_FULL_NAME — owner/repo
-#   PR_NUMBER      — pull request number
-#   GH_TOKEN       — GitHub token with pull-requests:read, checks:read, and
-#                    actions:read. Fine-grained PATs do not need Issues
-#                    permission; retry markers are read via `gh pr view`.
+#   REPO_FULL_NAME     — owner/repo (set by dispatch)
+#   GH_TOKEN           — GitHub token with pull-requests:read, checks:read, and
+#                        actions:read. Fine-grained PATs do not need Issues
+#                        permission; retry markers are read via `gh pr view`.
+#   GITHUB_ISSUE_URL   — PR URL (e.g. https://github.com/owner/repo/pull/123)
 #
 # Optional env:
-#   HEAD_SHA            — hint only; always refreshed from the PR head when
-#                         PR_NUMBER is set (avoids diagnosing a stale SHA)
 #   CHECK_CONTEXT_FILE  — output path (default: /tmp/workspace/check-context.json)
 #   MAX_FLAKE_RETRIES   — retry budget recorded in context (default: 1)
 #   OUTPUT_TEXT_MAX     — max chars of check output text to keep (default: 4000)
 #   LOG_EXCERPT_MAX     — max chars per workflow run log excerpt (default: 8000)
 set -euo pipefail
 
-# Fail fast if a required CLI tool is missing from PATH.
-require_cmd() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    echo "::error::Required command not found: $1"
+load_pr_from_url() {
+  local json
+  echo "::notice::Loading PR from ${GITHUB_ISSUE_URL}"
+  json="$(gh pr view "${GITHUB_ISSUE_URL}" --json number,url,title,headRefOid,headRefName,baseRefName)"
+  PR_NUMBER="$(jq -r '.number' <<<"${json}")"
+  PR_URL="$(jq -r '.url' <<<"${json}")"
+  PR_TITLE="$(jq -r '.title' <<<"${json}")"
+  PR_HEAD_REF="$(jq -r '.headRefName' <<<"${json}")"
+  PR_BASE_REF="$(jq -r '.baseRefName' <<<"${json}")"
+  HEAD_SHA="$(jq -r '.headRefOid' <<<"${json}")"
+  if [[ -z "${HEAD_SHA}" || "${HEAD_SHA}" == "null" ]]; then
+    echo "::error::Failed to resolve HEAD_SHA from ${GITHUB_ISSUE_URL}"
     exit 1
   fi
-}
-
-# Fail fast if a required environment variable is unset or empty.
-require_env() {
-  local name="$1"
-  if [[ -z "${!name:-}" ]]; then
-    echo "::error::Required environment variable not set: ${name}"
-    exit 1
-  fi
-}
-
-# Prefer the live PR head SHA over any caller-provided HEAD_SHA so we never
-# diagnose a commit that is no longer the PR tip.
-resolve_head_sha() {
-  local provided_sha="${HEAD_SHA:-}"
-  local pr_sha
-
-  echo "::notice::Resolving HEAD_SHA from PR #${PR_NUMBER}"
-  pr_sha="$(gh api "repos/${REPO_FULL_NAME}/pulls/${PR_NUMBER}" --jq '.head.sha')"
-  if [[ -z "${pr_sha}" || "${pr_sha}" == "null" ]]; then
-    if [[ -n "${provided_sha}" ]]; then
-      echo "::warning::Failed to resolve PR head; falling back to provided HEAD_SHA=${provided_sha}"
-      export HEAD_SHA="${provided_sha}"
-      return 0
-    fi
-    echo "::error::Failed to resolve HEAD_SHA for ${REPO_FULL_NAME}#${PR_NUMBER}"
-    exit 1
-  fi
-
-  if [[ -n "${provided_sha}" && "${provided_sha}" != "${pr_sha}" ]]; then
-    echo "::warning::Ignoring stale HEAD_SHA=${provided_sha}; using PR head ${pr_sha}"
-  fi
-
-  HEAD_SHA="${pr_sha}"
-  export HEAD_SHA
+  export PR_NUMBER PR_URL PR_TITLE PR_HEAD_REF PR_BASE_REF HEAD_SHA
 }
 
 # Read the highest <!-- fullsend:ci-diagnose-retries:N --> marker from PR
@@ -70,7 +42,7 @@ resolve_head_sha() {
 read_retries_used() {
   local max_seen api_output
   if api_output="$(
-    gh pr view "${PR_NUMBER}" --repo "${REPO_FULL_NAME}" --json comments --jq '
+    gh pr view "${GITHUB_ISSUE_URL}" --json comments --jq '
       [.comments[].body // empty
         | strings
         | capture("<!-- fullsend:ci-diagnose-retries:(?<n>[0-9]+) -->")?
@@ -221,57 +193,40 @@ write_check_context() {
   local retries_used="$3"
   local logs_dir="$4"
   local max_retries="${MAX_FLAKE_RETRIES:-1}"
-  local tmp_pr logs_json
+  local logs_json
 
-  tmp_pr="$(mktemp)"
-  logs_json="$(mktemp)"
-  gh api "repos/${REPO_FULL_NAME}/pulls/${PR_NUMBER}" >"${tmp_pr}"
-
-  # Build workflow_logs object: { "run_id": "log content", ... }
-  if [[ -d "${logs_dir}" ]] && compgen -G "${logs_dir}/*.txt" >/dev/null; then
-    (
-      printf '{'
-      local first=true
-      for f in "${logs_dir}"/*.txt; do
-        [[ -f "${f}" ]] || continue
-        local run_id
-        run_id="$(basename "${f}" .txt)"
-        if [[ "${first}" == "true" ]]; then
-          first=false
-        else
-          printf ','
-        fi
-        printf '%s:%s' "$(jq -n --arg k "${run_id}" '$k')" "$(jq -Rs . "${f}")"
-      done
-      printf '}'
-    ) >"${logs_json}"
-  else
-    echo '{}' >"${logs_json}"
-  fi
+  logs_json="$(
+    find "${logs_dir}" -name '*.txt' -print0 \
+      | xargs -0 -I{} sh -c 'printf "%s\t%s\n" "$(basename "$1" .txt)" "$(cat "$1")"' _ {} \
+      | jq -Rn '[inputs | split("\t") | {(.[0]): .[1]}] | add // {}'
+  )"
 
   jq -n \
     --arg repo "${REPO_FULL_NAME}" \
     --argjson pr_number "${PR_NUMBER}" \
     --arg sha "${HEAD_SHA}" \
+    --arg pr_url "${PR_URL}" \
+    --arg pr_title "${PR_TITLE}" \
+    --arg head_ref "${PR_HEAD_REF}" \
+    --arg base_ref "${PR_BASE_REF}" \
     --arg collected_at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
     --argjson retries_used "${retries_used}" \
     --argjson max_retries "${max_retries}" \
-    --slurpfile pr_json "${tmp_pr}" \
     --slurpfile checks "${checks_path}" \
     --slurpfile statuses "${statuses_path}" \
-    --slurpfile logs "${logs_json}" '
+    --argjson logs "${logs_json}" '
     {
       repo_full_name: $repo,
       pr_number: $pr_number,
       head_sha: $sha,
-      pr_url: $pr_json[0].html_url,
-      pr_title: $pr_json[0].title,
-      head_ref: $pr_json[0].head.ref,
-      base_ref: $pr_json[0].base.ref,
+      pr_url: $pr_url,
+      pr_title: $pr_title,
+      head_ref: $head_ref,
+      base_ref: $base_ref,
       collected_at: $collected_at,
       failing_checks: $checks[0],
       failing_statuses: $statuses[0],
-      workflow_logs: $logs[0],
+      workflow_logs: $logs,
       retry_budget: {
         max_flake_retries: $max_retries,
         retries_used: $retries_used,
@@ -279,23 +234,21 @@ write_check_context() {
       }
     }
   ' >"${CHECK_CONTEXT_FILE}"
-
-  rm -f "${tmp_pr}" "${logs_json}"
 }
 
 main() {
-  require_cmd gh
-  require_cmd jq
-  require_env REPO_FULL_NAME
-  require_env PR_NUMBER
-  require_env GH_TOKEN
+  command -v gh >/dev/null || { echo "::error::gh not found"; exit 1; }
+  command -v jq >/dev/null || { echo "::error::jq not found"; exit 1; }
+  : "${REPO_FULL_NAME:?Required env REPO_FULL_NAME is not set}"
+  : "${GH_TOKEN:?Required env GH_TOKEN is not set}"
+  : "${GITHUB_ISSUE_URL:?Required env GITHUB_ISSUE_URL is not set}"
   export GH_TOKEN
 
   CHECK_CONTEXT_FILE="${CHECK_CONTEXT_FILE:-/tmp/workspace/check-context.json}"
   mkdir -p "$(dirname "${CHECK_CONTEXT_FILE}")"
 
-  # 1) Pin to current PR head
-  resolve_head_sha
+  # 1) Pin to current PR head via `gh pr view` (URL)
+  load_pr_from_url
 
   echo "::notice::Collecting failing checks for ${REPO_FULL_NAME}#${PR_NUMBER} @ ${HEAD_SHA}"
 
