@@ -66,8 +66,8 @@ env:
     GITHUB_ISSUE_URL: "${GITHUB_ISSUE_URL}"
     CHECK_CONTEXT_FILE: /tmp/workspace/check-context.json
     FULLSEND_OUTPUT_FILE: ci-diagnose-result.json
-    MAX_FLAKE_RETRIES: "${MAX_FLAKE_RETRIES:-2}"
-    MIN_RETRY_CONFIDENCE: "${MIN_RETRY_CONFIDENCE:-0.7}"
+    MAX_FLAKE_RETRIES: "2"
+    MIN_RETRY_CONFIDENCE: "0.7"
   sandbox:
     ANTHROPIC_VERTEX_PROJECT_ID: "${ANTHROPIC_VERTEX_PROJECT_ID}"
     CHECK_CONTEXT_FILE: /sandbox/workspace/check-context.json
