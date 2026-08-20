@@ -17,13 +17,14 @@
 #   MIN_RETRY_CONFIDENCE   — minimum confidence to retry (set by harness yaml)
 #   CHECK_CONTEXT_FILE     — pre-script context (set by harness yaml)
 #
+#   FULLSEND_OUTPUT_FILE   — result filename (set by harness yaml)
+#
 # Optional env:
-#   FULLSEND_OUTPUT_FILE   — result filename (default: ci-diagnose-result.json)
 set -euo pipefail
 
 # Marker used by fullsend post-comment to upsert a sticky diagnosis comment.
 COMMENT_MARKER='<!-- fullsend:ci-diagnose -->'
-RESULT_NAME="${FULLSEND_OUTPUT_FILE:-ci-diagnose-result.json}"
+RESULT_NAME="${FULLSEND_OUTPUT_FILE}"
 
 # Numeric id for REST paths and `fullsend post-comment --number`.
 pr_number_from_url() {

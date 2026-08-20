@@ -7,8 +7,7 @@
 #
 # Required env:
 #   FULLSEND_OUTPUT_SCHEMA — path to the JSON Schema file
-# Optional env:
-#   FULLSEND_OUTPUT_FILE — filename to validate (default: ci-diagnose-result.json)
+#   FULLSEND_OUTPUT_FILE — filename to validate (set by harness yaml)
 set -euo pipefail
 
 : "${FULLSEND_OUTPUT_SCHEMA:?FULLSEND_OUTPUT_SCHEMA must be set}"
@@ -19,7 +18,7 @@ if [[ ! -d "${OUTPUT_DIR}" ]]; then
   exit 1
 fi
 
-_output_file="${FULLSEND_OUTPUT_FILE:-ci-diagnose-result.json}"
+_output_file="${FULLSEND_OUTPUT_FILE}"
 _output_file="$(basename "${_output_file}")"
 RESULT_FILE="${OUTPUT_DIR}/${_output_file}"
 
