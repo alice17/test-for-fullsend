@@ -11,6 +11,7 @@
 set -euo pipefail
 
 : "${FULLSEND_OUTPUT_SCHEMA:?FULLSEND_OUTPUT_SCHEMA must be set}"
+: "${FULLSEND_OUTPUT_FILE:?Required env FULLSEND_OUTPUT_FILE is not set}"
 
 OUTPUT_DIR="output"
 if [[ ! -d "${OUTPUT_DIR}" ]]; then

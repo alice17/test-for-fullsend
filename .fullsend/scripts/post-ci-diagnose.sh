@@ -132,6 +132,10 @@ main() {
   : "${REPO_FULL_NAME:?Required env REPO_FULL_NAME is not set}"
   : "${GH_TOKEN:?Required env GH_TOKEN is not set}"
   : "${GITHUB_ISSUE_URL:?Required env GITHUB_ISSUE_URL is not set}"
+  : "${CHECK_CONTEXT_FILE:?Required env CHECK_CONTEXT_FILE is not set}"
+  : "${MAX_FLAKE_RETRIES:?Required env MAX_FLAKE_RETRIES is not set}"
+  : "${MIN_RETRY_CONFIDENCE:?Required env MIN_RETRY_CONFIDENCE is not set}"
+  : "${FULLSEND_OUTPUT_FILE:?Required env FULLSEND_OUTPUT_FILE is not set}"
   export GH_TOKEN
 
   # 1) Load and validate agent output
