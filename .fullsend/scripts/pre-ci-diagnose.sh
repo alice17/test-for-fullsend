@@ -19,15 +19,16 @@
 set -euo pipefail
 
 load_pr_from_url() {
-  local json
   echo "::notice::Loading PR from ${GITHUB_ISSUE_URL}"
-  json="$(gh pr view "${GITHUB_ISSUE_URL}" --json number,url,title,headRefOid,headRefName,baseRefName)"
-  PR_NUMBER="$(jq -r '.number' <<<"${json}")"
-  PR_URL="$(jq -r '.url' <<<"${json}")"
-  PR_TITLE="$(jq -r '.title' <<<"${json}")"
-  PR_HEAD_REF="$(jq -r '.headRefName' <<<"${json}")"
-  PR_BASE_REF="$(jq -r '.baseRefName' <<<"${json}")"
-  HEAD_SHA="$(jq -r '.headRefOid' <<<"${json}")"
+  eval "$(
+    gh pr view "${GITHUB_ISSUE_URL}" --json number,url,title,headRefOid,headRefName,baseRefName \
+      | jq -r '@sh "PR_NUMBER=\(.number)",
+               @sh "PR_URL=\(.url)",
+               @sh "PR_TITLE=\(.title)",
+               @sh "PR_HEAD_REF=\(.headRefName)",
+               @sh "PR_BASE_REF=\(.baseRefName)",
+               @sh "HEAD_SHA=\(.headRefOid)"'
+  )"
   if [[ -z "${HEAD_SHA}" || "${HEAD_SHA}" == "null" ]]; then
     echo "::error::Failed to resolve HEAD_SHA from ${GITHUB_ISSUE_URL}"
     exit 1
