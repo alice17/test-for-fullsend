@@ -117,6 +117,8 @@ collect_failing_check_runs() {
           end
         )
       })
+    | group_by(.check_name)
+    | map(sort_by(.completed_at // .started_at // "0") | last)
   ' "${raw_path}" >"${out_path}"
 }
 
@@ -172,10 +174,16 @@ fetch_workflow_logs() {
     [[ -z "${run_id}" ]] && continue
     local log_file="${logs_dir}/${run_id}.txt"
     echo "::notice::Fetching failed logs for run ${run_id}"
-    if gh run view "${run_id}" --repo "${REPO_FULL_NAME}" --log-failed 2>/dev/null \
-        | tail -c "${max_log_chars}" >"${log_file}"; then
-      if [[ ! -s "${log_file}" ]]; then
+    local full_log
+    if full_log="$(gh run view "${run_id}" --repo "${REPO_FULL_NAME}" --log-failed 2>/dev/null)"; then
+      if [[ -z "${full_log}" ]]; then
         echo "(no failed-job log output)" >"${log_file}"
+      elif [[ "${#full_log}" -le "${max_log_chars}" ]]; then
+        printf '%s' "${full_log}" >"${log_file}"
+      else
+        { printf '…[%d chars truncated from start]…\n\n' "$(( ${#full_log} - max_log_chars ))"
+          tail -c "${max_log_chars}" <<<"${full_log}"
+        } >"${log_file}"
       fi
       count=$((count + 1))
     else
