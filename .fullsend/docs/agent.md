@@ -54,7 +54,7 @@ and [discussion #5182](https://github.com/fullsend-ai/fullsend/discussions/5182)
 ### `check-context.json` shape
 
 Written by the pre-script to `CHECK_CONTEXT_FILE`
-(default `/tmp/workspace/check-context.json`). The harness mounts that path into
+(set by `harness/ci-diagnose.yaml`). The harness mounts that path into
 the sandbox via `host_files` with `optional: true`, because Fullsend validates
 `host_files` before the pre-script runs:
 

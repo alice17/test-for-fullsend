@@ -47,7 +47,6 @@ available in the context file. Do not attempt to call `gh` or any API.
 ### Phase 1: Load check context
 
 ```bash
-CHECK_CONTEXT_FILE="${CHECK_CONTEXT_FILE:-/sandbox/workspace/check-context.json}"
 jq . "$CHECK_CONTEXT_FILE"
 ```
 

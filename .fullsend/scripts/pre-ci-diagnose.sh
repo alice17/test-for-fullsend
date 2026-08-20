@@ -11,9 +11,9 @@
 #                        permission; retry markers are read via `gh pr view`.
 #   GITHUB_ISSUE_URL   — PR URL (e.g. https://github.com/owner/repo/pull/123)
 #   MAX_FLAKE_RETRIES  — retry budget recorded in context (set by harness yaml)
+#   CHECK_CONTEXT_FILE — output path (set by harness yaml)
 #
 # Optional env:
-#   CHECK_CONTEXT_FILE  — output path (default: /tmp/workspace/check-context.json)
 #   OUTPUT_TEXT_MAX     — max chars of check output text to keep (default: 4000)
 #   LOG_EXCERPT_MAX     — max chars per workflow run log excerpt (default: 8000)
 set -euo pipefail
@@ -244,7 +244,7 @@ main() {
   : "${GITHUB_ISSUE_URL:?Required env GITHUB_ISSUE_URL is not set}"
   export GH_TOKEN
 
-  CHECK_CONTEXT_FILE="${CHECK_CONTEXT_FILE:-/tmp/workspace/check-context.json}"
+  CHECK_CONTEXT_FILE="${CHECK_CONTEXT_FILE}"
   mkdir -p "$(dirname "${CHECK_CONTEXT_FILE}")"
 
   # 1) Pin to current PR head via `gh pr view` (URL)

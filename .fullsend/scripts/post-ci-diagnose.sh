@@ -15,9 +15,9 @@
 #
 #   MAX_FLAKE_RETRIES      — max automatic flake retries (set by harness yaml)
 #   MIN_RETRY_CONFIDENCE   — minimum confidence to retry (set by harness yaml)
+#   CHECK_CONTEXT_FILE     — pre-script context (set by harness yaml)
 #
 # Optional env:
-#   CHECK_CONTEXT_FILE     — pre-script context (default: /tmp/workspace/check-context.json)
 #   FULLSEND_OUTPUT_FILE   — result filename (default: ci-diagnose-result.json)
 set -euo pipefail
 
@@ -51,7 +51,7 @@ find_result_file() {
 
 # retries_used from pre-script check-context.json (defaults to 0 if missing).
 retries_used_from_context() {
-  local context_file="${CHECK_CONTEXT_FILE:-/tmp/workspace/check-context.json}"
+  local context_file="${CHECK_CONTEXT_FILE}"
   local raw
   if [[ -f "${context_file}" ]]; then
     raw="$(jq -r '.retry_budget.retries_used // 0' "${context_file}" | tr -d '[:space:]')"
