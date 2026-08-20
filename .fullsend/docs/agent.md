@@ -31,8 +31,9 @@ GitHub pull requests.
    to it rather than duplicating the rules
 3. **Post-script** (`scripts/post-ci-diagnose.sh`) posts a sticky PR comment
    via `fullsend post-comment` and may re-request **only the individually
-   flaky** check runs within a retry budget (`MAX_FLAKE_RETRIES`, default
-   `2`; confidence ≥ `0.7`; `retries_remaining > 0`)
+   flaky** check runs within a retry budget (`MAX_FLAKE_RETRIES`;
+   confidence ≥ `MIN_RETRY_CONFIDENCE`; `retries_remaining > 0`).
+   Defaults are set in `harness/ci-diagnose.yaml` (`2` and `0.7`)
 
 The sandbox has **no GitHub token** and **no external API access** (only Vertex
 AI for inference). All network reads happen in the pre-script; all network
@@ -118,8 +119,8 @@ Pre/post scripts pass `GITHUB_ISSUE_URL` to `gh pr view` / `gh pr comment`.
 A numeric id is parsed from the URL only for REST paths and
 `fullsend post-comment --number`. `HEAD_SHA` is refreshed from
 `gh pr view --json headRefOid`. `MAX_FLAKE_RETRIES` and
-`MIN_RETRY_CONFIDENCE` are optional; the scripts default them to `2` and
-`0.7` when unset.
+`MIN_RETRY_CONFIDENCE` are optional; defaults (`2` and `0.7`) are set in
+`harness/ci-diagnose.yaml` and passed to the runner env.
 
 ## Status comments and mint role
 
