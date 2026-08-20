@@ -154,6 +154,8 @@ Required shape:
       "workflow_run_url": "https://github.com/owner/repo/actions/runs/987654321",
       "workflow_run_id": 987654321,
       "job_name": "test",
+      "classification": "flaky",
+      "confidence": 0.82,
       "root_cause": "Jest timed out waiting for a network mock",
       "evidence": ["Timeout - Async callback was not invoked", "ERR_CONNECTION_RESET"]
     }
