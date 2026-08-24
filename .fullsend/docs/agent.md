@@ -31,8 +31,9 @@ GitHub pull requests.
    to it rather than duplicating the rules
 3. **Post-script** (`scripts/post-ci-diagnose.sh`) posts a sticky PR comment
    via `fullsend post-comment` and may re-request **only the individually
-   flaky** check runs within a retry budget (`MAX_FLAKE_RETRIES`;
-   confidence ≥ `MIN_RETRY_CONFIDENCE`; `retries_remaining > 0`).
+   flaky** check runs within a per-check retry budget (`MAX_FLAKE_RETRIES`;
+   confidence ≥ `MIN_RETRY_CONFIDENCE`; per-check `retries_remaining > 0`).
+   Budgets are scoped to `head_sha` — new commits reset them.
    Defaults are set in `harness/ci-diagnose.yaml` (`2` and `0.7`)
 
 The sandbox has **no GitHub token** and **no external API access** (only Vertex
@@ -68,10 +69,13 @@ the sandbox via `host_files` with `optional: true`, because Fullsend validates
 - `failing_statuses[]` — commit statuses in `failure` / `error` state
 - `workflow_logs` — object keyed by workflow run ID (string) with truncated
   failed-job log excerpts as values (max `LOG_EXCERPT_MAX` chars, default 8000)
-- `retry_budget` — `{ max_flake_retries, retries_used, retries_remaining }`
-  (`retries_used` is read from sticky PR conversation comments via
-  `gh pr view`, not the Issues comments REST API, so a fine-grained PAT
-  with `pull-requests:read` is enough)
+- `retry_budget` — `{ max_flake_retries, per_check: { <name>: { retries_used, retries_remaining } } }`.
+  Retry counts are per-check and scoped to `head_sha`, so new commits
+  implicitly reset the budget. Markers are read from sticky PR
+  conversation comments via `gh pr view` (format:
+  `<!-- fullsend:ci-diagnose-retries:CHECK_NAME:SHA:N -->`), not the
+  Issues comments REST API, so a fine-grained PAT with
+  `pull-requests:read` is enough
 
 ### Result schema
 

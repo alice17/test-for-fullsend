@@ -30,7 +30,7 @@ Environment / host files set by the pre-script:
 - `CHECK_CONTEXT_FILE` — path to JSON with PR metadata (`repo_full_name`,
   `pr_number`, `head_sha`, `pr_url`, `pr_title`), failing checks,
   pre-fetched workflow logs, and a `retry_budget` object
-  (`max_flake_retries`, `retries_used`, `retries_remaining`)
+  (`max_flake_retries`, `per_check: { <name>: { retries_used, retries_remaining } }`)
   (default: `/sandbox/workspace/check-context.json`)
 - `FULLSEND_OUTPUT_DIR` — directory for the result file (default:
   `/sandbox/workspace/output`; must write here or Fullsend cannot extract it)
@@ -113,8 +113,10 @@ Apply the classification rules and confidence guidance from the
 ### Phase 5: Choose recommended action
 
 - `retry` — only if overall `classification` is `flaky`, `confidence >= 0.7`,
-  at least one `retry_targets` entry exists, **and** `retry_budget.retries_remaining > 0`
-  in the check context. If the budget is exhausted, use `comment_only` instead
+  at least one `retry_targets` entry exists, **and** the target check has
+  `retry_budget.per_check[check_name].retries_remaining > 0` in the check
+  context. If the budget is exhausted for a check, exclude it from
+  `retry_targets`. If all flaky checks are exhausted, use `comment_only`
 - `comment_only` — diagnosis is useful but retry is inappropriate
 - `escalate` — needs human investigation (`needs_human` status or low confidence)
 
