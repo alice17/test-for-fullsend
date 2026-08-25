@@ -5,7 +5,7 @@
 # See ADR 0033 for details.
 version: "1"
 roles:
-    - ci-diagnose
+    - review
 agents:
   - name: ci-diagnose
     source: harness/ci-diagnose.yaml
