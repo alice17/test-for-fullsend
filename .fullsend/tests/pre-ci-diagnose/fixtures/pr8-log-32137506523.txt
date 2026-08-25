@@ -1,0 +1,6 @@
+flaky-unit	UNKNOWN STEP	2026-08-18T12:34:03.1234567Z ##[notice]Flaky fixture job (outcome mode: random)
+flaky-unit	UNKNOWN STEP	2026-08-18T12:34:03.2345678Z FAIL src/widget.test.js
+flaky-unit	UNKNOWN STEP	2026-08-18T12:34:03.2345700Z   Widget › loads remote config
+flaky-unit	UNKNOWN STEP	2026-08-18T12:34:03.2345800Z     Timeout - Async callback was not invoked within the 5000 ms timeout specified by jest.setTimeout.
+flaky-unit	UNKNOWN STEP	2026-08-18T12:34:03.2345900Z       at src/widget.test.js:42
+flaky-unit	UNKNOWN STEP	2026-08-18T12:34:03.2346000Z ##[error]Process completed with exit code 1.

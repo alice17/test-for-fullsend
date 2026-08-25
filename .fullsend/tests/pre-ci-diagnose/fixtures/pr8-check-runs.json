@@ -1,0 +1,76 @@
+{
+  "check_runs": [
+    {
+      "id": 95712166792,
+      "name": "infra-pull",
+      "conclusion": "failure",
+      "status": "completed",
+      "details_url": "https://github.com/alice17/test-for-fullsend/actions/runs/32137506657/job/95712166792",
+      "html_url": "https://github.com/alice17/test-for-fullsend/actions/runs/32137506657/job/95712166792",
+      "started_at": "2026-08-18T12:34:02Z",
+      "completed_at": "2026-08-18T12:34:05Z",
+      "app": { "slug": "github-actions" },
+      "output": { "title": null, "summary": null, "text": null, "annotations_count": 0 }
+    },
+    {
+      "id": 95712166264,
+      "name": "flaky-unit",
+      "conclusion": "failure",
+      "status": "completed",
+      "details_url": "https://github.com/alice17/test-for-fullsend/actions/runs/32137506523/job/95712166264",
+      "html_url": "https://github.com/alice17/test-for-fullsend/actions/runs/32137506523/job/95712166264",
+      "started_at": "2026-08-18T12:34:02Z",
+      "completed_at": "2026-08-18T12:34:04Z",
+      "app": { "slug": "github-actions" },
+      "output": { "title": null, "summary": null, "text": null, "annotations_count": 0 }
+    },
+    {
+      "id": 94478003331,
+      "name": "infra-pull",
+      "conclusion": "failure",
+      "status": "completed",
+      "details_url": "https://github.com/alice17/test-for-fullsend/actions/runs/31709363545/job/94478003331",
+      "html_url": "https://github.com/alice17/test-for-fullsend/actions/runs/31709363545/job/94478003331",
+      "started_at": "2026-08-13T14:17:14Z",
+      "completed_at": "2026-08-13T14:17:18Z",
+      "app": { "slug": "github-actions" },
+      "output": { "title": null, "summary": null, "text": null, "annotations_count": 0 }
+    },
+    {
+      "id": 93472662022,
+      "name": "dispatch / Retro",
+      "conclusion": "failure",
+      "status": "completed",
+      "details_url": "https://github.com/alice17/test-for-fullsend/actions/runs/31394086670/job/93472662022",
+      "html_url": "https://github.com/alice17/test-for-fullsend/actions/runs/31394086670/job/93472662022",
+      "started_at": "2026-08-10T13:40:49Z",
+      "completed_at": "2026-08-10T13:41:24Z",
+      "app": { "slug": "github-actions" },
+      "output": { "title": null, "summary": null, "text": null, "annotations_count": 0 }
+    },
+    {
+      "id": 95716816626,
+      "name": "dispatch / Route",
+      "conclusion": "success",
+      "status": "completed",
+      "details_url": "https://github.com/alice17/test-for-fullsend/actions/runs/32138965311/job/95716816626",
+      "html_url": "https://github.com/alice17/test-for-fullsend/actions/runs/32138965311/job/95716816626",
+      "started_at": "2026-08-18T12:50:21Z",
+      "completed_at": "2026-08-18T12:50:27Z",
+      "app": { "slug": "github-actions" },
+      "output": { "title": null, "summary": null, "text": null, "annotations_count": 0 }
+    },
+    {
+      "id": 95716817498,
+      "name": "stop-fix",
+      "conclusion": "skipped",
+      "status": "completed",
+      "details_url": "https://github.com/alice17/test-for-fullsend/actions/runs/32138965311/job/95716817498",
+      "html_url": "https://github.com/alice17/test-for-fullsend/actions/runs/32138965311/job/95716817498",
+      "started_at": "2026-08-18T12:50:19Z",
+      "completed_at": "2026-08-18T12:50:19Z",
+      "app": { "slug": "github-actions" },
+      "output": { "title": null, "summary": null, "text": null, "annotations_count": 0 }
+    }
+  ]
+}

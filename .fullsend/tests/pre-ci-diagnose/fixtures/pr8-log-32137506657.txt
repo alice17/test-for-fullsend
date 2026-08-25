@@ -1,0 +1,9 @@
+infra-pull	UNKNOWN STEP	2026-08-18T12:34:03.5262934Z ##[notice]Infra fixture job (outcome mode: fail)
+infra-pull	UNKNOWN STEP	2026-08-18T12:34:03.5269305Z ERROR: failed to pull image ghcr.io/example/ci-runner:latest
+infra-pull	UNKNOWN STEP	2026-08-18T12:34:03.5270319Z Error response from daemon: Get "https://ghcr.io/v2/": remote error: 503 Service Unavailable
+infra-pull	UNKNOWN STEP	2026-08-18T12:34:03.5271798Z registry.npmjs.org: npm ERR! code ECONNREFUSED
+infra-pull	UNKNOWN STEP	2026-08-18T12:34:03.5272728Z npm ERR! network request to https://registry.npmjs.org/lodash failed, reason: connect ECONNREFUSED
+infra-pull	UNKNOWN STEP	2026-08-18T12:34:03.5273733Z GitHub Actions has been rate-limited; unable to schedule a runner
+infra-pull	UNKNOWN STEP	2026-08-18T12:34:03.5274449Z No space left on device: /var/lib/docker
+infra-pull	UNKNOWN STEP	2026-08-18T12:34:03.5277676Z ##[error]infra-pull failed: container registry 503 and runner quota/disk exhaustion (persistent infra)
+infra-pull	UNKNOWN STEP	2026-08-18T12:34:03.5287266Z ##[error]Process completed with exit code 1.

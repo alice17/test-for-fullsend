@@ -1,0 +1,10 @@
+{
+  "comments": [
+    {
+      "body": "/fs-ci-diagnose"
+    },
+    {
+      "body": "## CI Diagnosis\n\nSome analysis text.\n\n<!-- fullsend:ci-diagnose-retries:flaky-unit:48e2e31dd67514b23a30ea965796200b63b8119a:1 -->"
+    }
+  ]
+}
