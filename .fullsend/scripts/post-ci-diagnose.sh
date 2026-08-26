@@ -18,8 +18,6 @@
 #   CHECK_CONTEXT_FILE     — pre-script context (set by harness yaml)
 #
 #   FULLSEND_OUTPUT_FILE   — result filename (set by harness yaml)
-#
-# Optional env:
 set -euo pipefail
 
 # Marker used by fullsend post-comment to upsert a sticky diagnosis comment.
