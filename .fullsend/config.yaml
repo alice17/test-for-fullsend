@@ -9,7 +9,6 @@
 # flag wins, then FULLSEND_RUNTIME, then this file. See docs/runtimes.md.
 version: "1"
 roles:
-    - triage
     - review
 allowed_remote_resources:
     - https://raw.githubusercontent.com/fullsend-ai/fullsend/
