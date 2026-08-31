@@ -12,6 +12,7 @@ allowed_remote_resources:
     - https://raw.githubusercontent.com/fullsend-ai/fullsend/
     - https://raw.githubusercontent.com/fullsend-ai/agents/
     - https://raw.githubusercontent.com/alice17/fullsend-ci-diagnose/
+    - https://raw.githubusercontent.com/alice17/fullsend-ci-diagnose/agents/
 create_issues:
     allow_targets:
         repos:
