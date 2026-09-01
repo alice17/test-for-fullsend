@@ -21,3 +21,7 @@ create_issues:
         repos:
             - alice17/test-for-fullsend
             - fullsend-ai/fullsend
+mint_url: https://fullsend-mint-gljhbkcloq-uc.a.run.app
+inference:
+    project: it-gcp-cidiagnose
+    wif_provider: projects/952709608696/locations/global/workloadIdentityPools/fullsend-inference/providers/gh-alice17-test-for-fullsend
