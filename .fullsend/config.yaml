@@ -2,16 +2,12 @@
 # https://github.com/fullsend-ai/fullsend
 #
 # This file configures fullsend for per-repo installation mode.
-# See ADR 0033 for details.
-#
-# The "runtime" key selects which agent runtime runs the agents, claude
-# (default when unset) or pi. For one run, the 'fullsend run --runtime'
-# flag wins, then FULLSEND_RUNTIME, then this file. See docs/runtimes.md.
+# See https://fullsend.sh/docs/guides/infrastructure/layered-config-reference
 version: "1"
 roles:
     - review
 agents:
-    - source: https://raw.githubusercontent.com/alice17/fullsend-ci-diagnose/76162227953ae7e14d1cae685e1cc7cc320983e8/harness/ci-diagnose.yaml#sha256=b2b597c33ba16e4954538186ccd924f67e51d95b8f50e2db06c103e66ad01140
+    - source: https://raw.githubusercontent.com/alice17/fullsend-ci-diagnose/56bd28cc2647629a83dc964620b7080edcaf1ddb/harness/ci-diagnose.yaml#sha256=66767bbe6810932c4ed2614b4307d01e8856e3ca246c02da8e2c055f7f594cae
 allowed_remote_resources:
     - https://raw.githubusercontent.com/fullsend-ai/fullsend/
     - https://raw.githubusercontent.com/fullsend-ai/agents/
