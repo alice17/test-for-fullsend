@@ -7,7 +7,7 @@ version: "1"
 roles:
     - review
 agents:
-    - source: https://raw.githubusercontent.com/alice17/fullsend-ci-diagnose/c5be3dfeef710d8674b2dc5e01e2a9ca0fbbca5b/harness/ci-diagnose.yaml#sha256=ea6e807804680a943c4f779d595fcae2e1d10f4e68d41854f5f12b57e43d1912
+    - source: https://raw.githubusercontent.com/alice17/fullsend-ci-diagnose/77c2b416570abe6e94853ffa40079258150866fe/harness/ci-diagnose.yaml#sha256=cede6ee40345ab486f1e4c85d320decc7b9cbf47925706e889b9a5d1caef8e5e
 allowed_remote_resources:
     - https://raw.githubusercontent.com/fullsend-ai/fullsend/
     - https://raw.githubusercontent.com/fullsend-ai/agents/
