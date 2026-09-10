@@ -45,7 +45,7 @@ jobs:
       issues: write
       packages: read
       pull-requests: write
-    uses: fullsend-ai/fullsend/.github/workflows/reusable-dispatch.yml@a4b5c48550596d47924cd6e858b27db3d522de3b # main
+    uses: fullsend-ai/fullsend/.github/workflows/reusable-dispatch.yml@fix/7140-hyphenated-role-identifiers
     with:
       event_action: ${{ github.event.action }}
       install_mode: per-repo
