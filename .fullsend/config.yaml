@@ -5,7 +5,7 @@
 # See https://fullsend.sh/docs/guides/infrastructure/layered-config-reference
 version: "1"
 agents:
-    - source: https://raw.githubusercontent.com/alice17/fullsend-ci-diagnose/8b9515fc784202f16dd9ae84d9e183fcc4c4b2ac/harness/ci-diagnose.yaml#sha256=b5e6cc190b5a7d7c80ef9e956ba5b0a8a23d36ecf2615b0c5de8d54988515b47
+    - source: https://raw.githubusercontent.com/alice17/fullsend-ci-diagnose/450fe7919f6ba52dc8d19231ce9e0b5a8548169d/harness/ci-diagnose.yaml#sha256=74c8d41b1f05482629f8d9b99f793e0010d206fd28e5ee657c3b624cd1fcd18d
 allowed_remote_resources:
     - https://raw.githubusercontent.com/fullsend-ai/fullsend/
     - https://raw.githubusercontent.com/fullsend-ai/agents/
