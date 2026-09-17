@@ -1,2 +1,5 @@
 .env.local
 fullsend-local-credentials.json
+*.code-workspace
+.cursor
+.fullsend/.fullsend-cache
