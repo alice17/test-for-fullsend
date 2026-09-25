@@ -1,0 +1,24 @@
+# ci-rerun.yaml — Re-run flaky CI jobs identified by the ci-diagnose agent.
+#
+# Thin caller for the reusable workflow in fullsend-ci-diagnose.
+# This file owns the workflow_run trigger (per-repo); all logic lives
+# in the callee (ADR 0124, chaining-follow-up-workflows guide).
+---
+name: ci-rerun
+
+on:
+  workflow_run:
+    workflows: ["fullsend"]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  rerun:
+    if: github.event.workflow_run.conclusion == 'success'
+    permissions:
+      actions: write
+    uses: alice17/fullsend-ci-diagnose/.github/workflows/ci-rerun.yaml@post-workflow
+    with:
+      run-id: ${{ github.event.workflow_run.id }}
+      head-sha: ${{ github.event.workflow_run.head_sha }}
