@@ -21,4 +21,3 @@ jobs:
     uses: alice17/fullsend-ci-diagnose/.github/workflows/ci-rerun.yaml@post-workflow
     with:
       run-id: ${{ github.event.workflow_run.id }}
-      head-sha: ${{ github.event.workflow_run.head_sha }}
